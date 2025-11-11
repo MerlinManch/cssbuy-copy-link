@@ -188,7 +188,7 @@
     button.textContent = TEXTS.buttonLabel;
     button.style.cursor = 'pointer';
     button.style.padding = '8px 12px';
-    button.style.margin = '0';
+    button.style.margin = '8px';
     button.style.border = '1px solid #1a73e8';
     button.style.borderRadius = '4px';
     button.style.background = '#1a73e8';
@@ -198,11 +198,6 @@
     button.style.transition = 'background-color 0.2s ease, transform 0.2s ease';
     button.style.boxShadow = '0 2px 6px rgba(26, 115, 232, 0.3)';
     button.style.zIndex = '9999';
-    button.style.position = 'fixed';
-    button.style.right = '24px';
-    button.style.bottom = '24px';
-    button.style.minWidth = '180px';
-    button.style.textAlign = 'center';
 
     button.addEventListener('mouseenter', () => {
       button.style.background = '#1669c1';
@@ -308,7 +303,21 @@
   function insertButton() {
     const button = createButton();
     if (!button.isConnected) {
-      document.body.appendChild(button);
+      const targetSelectors = ['.detail-info', '.product-detail', '.item-detail', '.goods-info', '#__nuxt', 'body'];
+      let inserted = false;
+
+      for (const selector of targetSelectors) {
+        const container = document.querySelector(selector);
+        if (container) {
+          container.insertBefore(button, container.firstChild);
+          inserted = true;
+          break;
+        }
+      }
+
+      if (!inserted) {
+        document.body.appendChild(button);
+      }
     }
   }
 
