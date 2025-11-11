@@ -1,9 +1,3 @@
-diff --git a/cssbuy-copy-link.user.js b/cssbuy-copy-link.user.js
-new file mode 100644
-index 0000000000000000000000000000000000000000..dae0dd6b68e8b7ece0746932eec9c7adf79fbc5b
---- /dev/null
-+++ b/cssbuy-copy-link.user.js
-@@ -0,0 +1,345 @@
 +// ==UserScript==
 +// @name         CSSBuy Copy Original Link
 +// @namespace    https://github.com/user/tampermonkey-scripts
