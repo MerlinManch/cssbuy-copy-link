@@ -9,6 +9,7 @@ static char ChatGPTOverlayGestureInstalledKey;
 + (instancetype)shared;
 - (void)installGestureRecognizers;
 - (void)openSystemLogin;
+- (void)refreshWebViewAfterSystemLogin;
 - (void)toggle;
 @end
 
@@ -61,7 +62,9 @@ static char ChatGPTOverlayGestureInstalledKey;
     _overlayWindow.rootViewController = vc;
 
     CGRect webFrame = CGRectInset(UIScreen.mainScreen.bounds, 20, 80);
-    _webView = [[WKWebView alloc] initWithFrame:webFrame];
+    WKWebViewConfiguration *config = [WKWebViewConfiguration new];
+    config.websiteDataStore = [WKWebsiteDataStore defaultDataStore];
+    _webView = [[WKWebView alloc] initWithFrame:webFrame configuration:config];
     _webView.layer.cornerRadius = 16;
     _webView.layer.masksToBounds = YES;
     [vc.view addSubview:_webView];
@@ -125,6 +128,7 @@ static char ChatGPTOverlayGestureInstalledKey;
     NSURL *url = _webView.URL ?: [NSURL URLWithString:@"https://chatgpt.com"];
     _authSession = [[ASWebAuthenticationSession alloc] initWithURL:url callbackURLScheme:nil completionHandler:^(__unused NSURL *callbackURL, __unused NSError *error) {
         self->_authSession = nil;
+        [self refreshWebViewAfterSystemLogin];
     }];
 
     if ([_authSession respondsToSelector:@selector(setPresentationContextProvider:)]) {
@@ -135,6 +139,15 @@ static char ChatGPTOverlayGestureInstalledKey;
     }
 
     [_authSession start];
+}
+
+- (void)refreshWebViewAfterSystemLogin {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!self->_webView) return;
+
+        NSURL *url = self->_webView.URL ?: [NSURL URLWithString:@"https://chatgpt.com"];
+        [self->_webView loadRequest:[NSURLRequest requestWithURL:url]];
+    });
 }
 
 - (void)toggle {
@@ -165,6 +178,7 @@ static void chatgpt_overlay_entry(void) {
         }];
         [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:queue usingBlock:^(__unused NSNotification *note) {
             chatgpt_overlay_install();
+            [[ChatGPTOverlay shared] refreshWebViewAfterSystemLogin];
         }];
         [center addObserverForName:UIWindowDidBecomeKeyNotification object:nil queue:queue usingBlock:^(__unused NSNotification *note) {
             chatgpt_overlay_install();

@@ -37,6 +37,14 @@ Darum öffnet der Button `Login/System` den aktuellen ChatGPT-Link mit
 Drittanbietern geeigneter als eine eingebettete `WKWebView`; Passkeys stehen dort
 wie in Safari zur Verfügung.
 
+Wichtig: iOS stellt die Safari-/`ASWebAuthenticationSession`-Cookies nicht so zur
+Verfügung, dass eine injizierte App sie inklusive `HttpOnly`-/Session-Cookies in
+eine `WKWebView` kopieren könnte. Die WebView nutzt deshalb den persistenten
+`WKWebsiteDataStore.defaultDataStore()` und wird nach der Rückkehr aus dem
+System-Login neu geladen. Dadurch bleiben Cookies erhalten, die innerhalb dieser
+`WKWebView` gesetzt werden; ein vollständiges Übernehmen der OpenAI-Session aus
+dem System-Login in die WebView ist aber von iOS/OpenAI nicht erlaubt.
+
 Für eigene Domains kann `WKWebView` mit Passkeys funktionieren, wenn alle Punkte
 zusammenpassen:
 
