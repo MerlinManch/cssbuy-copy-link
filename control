@@ -1,0 +1,8 @@
+Package: com.user.chatgptoverlay
+Name: ChatGPTOverlay
+Version: 1.0
+Architecture: iphoneos-arm
+Description: 3-finger-tap ChatGPT overlay
+Maintainer: User
+Author: User
+Section: Tweaks
