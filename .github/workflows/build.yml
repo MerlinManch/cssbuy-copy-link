@@ -32,6 +32,8 @@ jobs:
           clang -dynamiclib -arch arm64 -arch arm64e \
             -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
             -miphoneos-version-min=14.0 \
+            -fobjc-arc \
+            -x objective-c++ \
             -framework UIKit -framework WebKit \
             "$SRC" -o "$OUT"
           install_name_tool -id @executable_path/Frameworks/ChatGPTOverlay.dylib "$OUT"
