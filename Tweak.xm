@@ -1,20 +1,22 @@
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
-#import <SafariServices/SafariServices.h>
+#import <AuthenticationServices/AuthenticationServices.h>
 #import <objc/runtime.h>
 
 static char ChatGPTOverlayGestureInstalledKey;
 
-@interface ChatGPTOverlay : NSObject
+@interface ChatGPTOverlay : NSObject <ASWebAuthenticationPresentationContextProviding>
 + (instancetype)shared;
 - (void)installGestureRecognizers;
-- (void)openInSafari;
+- (void)openSystemLogin;
+- (void)refreshWebViewAfterSystemLogin;
 - (void)toggle;
 @end
 
 @implementation ChatGPTOverlay {
     UIWindow *_overlayWindow;
     WKWebView *_webView;
+    ASWebAuthenticationSession *_authSession;
     BOOL _visible;
 }
 
@@ -60,7 +62,9 @@ static char ChatGPTOverlayGestureInstalledKey;
     _overlayWindow.rootViewController = vc;
 
     CGRect webFrame = CGRectInset(UIScreen.mainScreen.bounds, 20, 80);
-    _webView = [[WKWebView alloc] initWithFrame:webFrame];
+    WKWebViewConfiguration *config = [WKWebViewConfiguration new];
+    config.websiteDataStore = [WKWebsiteDataStore defaultDataStore];
+    _webView = [[WKWebView alloc] initWithFrame:webFrame configuration:config];
     _webView.layer.cornerRadius = 16;
     _webView.layer.masksToBounds = YES;
     [vc.view addSubview:_webView];
@@ -75,15 +79,15 @@ static char ChatGPTOverlayGestureInstalledKey;
     [vc.view addSubview:closeBtn];
 
     UIButton *safariBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [safariBtn setTitle:@"Login/Safari" forState:UIControlStateNormal];
+    [safariBtn setTitle:@"Login/System" forState:UIControlStateNormal];
     safariBtn.frame = CGRectMake(CGRectGetMaxX(closeBtn.frame) + 12, 40, 120, 32);
     safariBtn.backgroundColor = [UIColor colorWithWhite:0 alpha:0.7];
     [safariBtn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     safariBtn.layer.cornerRadius = 8;
-    [safariBtn addTarget:self action:@selector(openInSafari) forControlEvents:UIControlEventTouchUpInside];
+    [safariBtn addTarget:self action:@selector(openSystemLogin) forControlEvents:UIControlEventTouchUpInside];
     [vc.view addSubview:safariBtn];
 
-    NSURL *url = [NSURL URLWithString:@"https://chat.openai.com"];
+    NSURL *url = [NSURL URLWithString:@"https://chatgpt.com"];
     [_webView loadRequest:[NSURLRequest requestWithURL:url]];
 }
 
@@ -106,14 +110,44 @@ static char ChatGPTOverlayGestureInstalledKey;
     }
 }
 
-- (void)openInSafari {
+- (ASPresentationAnchor)presentationAnchorForWebAuthenticationSession:(ASWebAuthenticationSession *)session {
     [self setupIfNeeded];
-    if (!_overlayWindow.rootViewController) return;
+    if (_overlayWindow) return _overlayWindow;
 
-    NSURL *url = _webView.URL ?: [NSURL URLWithString:@"https://chat.openai.com"];
-    SFSafariViewController *safari = [[SFSafariViewController alloc] initWithURL:url];
-    safari.modalPresentationStyle = UIModalPresentationFullScreen;
-    [_overlayWindow.rootViewController presentViewController:safari animated:YES completion:nil];
+    UIWindowScene *scene = [self activeWindowScene];
+    for (UIWindow *window in scene.windows) {
+        if (window) return window;
+    }
+
+    return nil;
+}
+
+- (void)openSystemLogin {
+    [self setupIfNeeded];
+
+    NSURL *url = _webView.URL ?: [NSURL URLWithString:@"https://chatgpt.com"];
+    _authSession = [[ASWebAuthenticationSession alloc] initWithURL:url callbackURLScheme:nil completionHandler:^(__unused NSURL *callbackURL, __unused NSError *error) {
+        self->_authSession = nil;
+        [self refreshWebViewAfterSystemLogin];
+    }];
+
+    if ([_authSession respondsToSelector:@selector(setPresentationContextProvider:)]) {
+        _authSession.presentationContextProvider = self;
+    }
+    if ([_authSession respondsToSelector:@selector(setPrefersEphemeralWebBrowserSession:)]) {
+        _authSession.prefersEphemeralWebBrowserSession = NO;
+    }
+
+    [_authSession start];
+}
+
+- (void)refreshWebViewAfterSystemLogin {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!self->_webView) return;
+
+        NSURL *url = self->_webView.URL ?: [NSURL URLWithString:@"https://chatgpt.com"];
+        [self->_webView loadRequest:[NSURLRequest requestWithURL:url]];
+    });
 }
 
 - (void)toggle {
@@ -144,6 +178,7 @@ static void chatgpt_overlay_entry(void) {
         }];
         [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:queue usingBlock:^(__unused NSNotification *note) {
             chatgpt_overlay_install();
+            [[ChatGPTOverlay shared] refreshWebViewAfterSystemLogin];
         }];
         [center addObserverForName:UIWindowDidBecomeKeyNotification object:nil queue:queue usingBlock:^(__unused NSNotification *note) {
             chatgpt_overlay_install();
