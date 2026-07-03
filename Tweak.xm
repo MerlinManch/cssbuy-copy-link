@@ -1,8 +1,12 @@
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
+#import <objc/runtime.h>
+
+static char ChatGPTOverlayGestureInstalledKey;
 
 @interface ChatGPTOverlay : NSObject
 + (instancetype)shared;
+- (void)installGestureRecognizers;
 - (void)toggle;
 @end
 
@@ -21,21 +25,33 @@
     return instance;
 }
 
+- (UIWindowScene *)activeWindowScene {
+    for (UIScene *s in [UIApplication sharedApplication].connectedScenes) {
+        if ([s isKindOfClass:[UIWindowScene class]] && s.activationState == UISceneActivationStateForegroundActive) {
+            return (UIWindowScene *)s;
+        }
+    }
+
+    for (UIScene *s in [UIApplication sharedApplication].connectedScenes) {
+        if ([s isKindOfClass:[UIWindowScene class]]) {
+            return (UIWindowScene *)s;
+        }
+    }
+
+    return nil;
+}
+
 - (void)setupIfNeeded {
     if (_overlayWindow) return;
 
-    UIWindowScene *scene = nil;
-    for (UIScene *s in [UIApplication sharedApplication].connectedScenes) {
-        if ([s isKindOfClass:[UIWindowScene class]]) {
-            scene = (UIWindowScene *)s;
-            break;
-        }
-    }
+    UIWindowScene *scene = [self activeWindowScene];
+    if (!scene) return;
 
     _overlayWindow = [[UIWindow alloc] initWithWindowScene:scene];
     _overlayWindow.frame = UIScreen.mainScreen.bounds;
     _overlayWindow.windowLevel = UIWindowLevelAlert + 1;
     _overlayWindow.backgroundColor = UIColor.clearColor;
+    _overlayWindow.hidden = YES;
 
     UIViewController *vc = [UIViewController new];
     vc.view.backgroundColor = [UIColor colorWithWhite:0 alpha:0.4];
@@ -60,8 +76,29 @@
     [_webView loadRequest:[NSURLRequest requestWithURL:url]];
 }
 
+- (void)installGestureRecognizers {
+    for (UIScene *s in [UIApplication sharedApplication].connectedScenes) {
+        if (![s isKindOfClass:[UIWindowScene class]]) continue;
+
+        for (UIWindow *window in ((UIWindowScene *)s).windows) {
+            if (!window || window == _overlayWindow) continue;
+            if (objc_getAssociatedObject(window, &ChatGPTOverlayGestureInstalledKey)) continue;
+
+            UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
+                initWithTarget:self action:@selector(toggle)];
+            tap.numberOfTouchesRequired = 3;
+            tap.cancelsTouchesInView = NO;
+            [window addGestureRecognizer:tap];
+
+            objc_setAssociatedObject(window, &ChatGPTOverlayGestureInstalledKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+    }
+}
+
 - (void)toggle {
     [self setupIfNeeded];
+    if (!_overlayWindow) return;
+
     _visible = !_visible;
     _overlayWindow.hidden = !_visible;
     if (_visible) [_overlayWindow makeKeyAndVisible];
@@ -69,23 +106,31 @@
 
 @end
 
+static void chatgpt_overlay_install(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[ChatGPTOverlay shared] installGestureRecognizers];
+    });
+}
+
 __attribute__((constructor))
 static void chatgpt_overlay_entry(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIWindow *keyWindow = nil;
-        for (UIScene *s in [UIApplication sharedApplication].connectedScenes) {
-            if ([s isKindOfClass:[UIWindowScene class]]) {
-                for (UIWindow *w in ((UIWindowScene *)s).windows) {
-                    if (w.isKeyWindow) { keyWindow = w; break; }
-                }
-            }
-        }
-        if (!keyWindow) return;
+        NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+        NSOperationQueue *queue = [NSOperationQueue mainQueue];
 
-        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
-            initWithTarget:[ChatGPTOverlay shared] action:@selector(toggle)];
-        tap.numberOfTouchesRequired = 3;
-        tap.cancelsTouchesInView = NO;
-        [keyWindow addGestureRecognizer:tap];
+        [center addObserverForName:UIApplicationDidFinishLaunchingNotification object:nil queue:queue usingBlock:^(__unused NSNotification *note) {
+            chatgpt_overlay_install();
+        }];
+        [center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:queue usingBlock:^(__unused NSNotification *note) {
+            chatgpt_overlay_install();
+        }];
+        [center addObserverForName:UIWindowDidBecomeKeyNotification object:nil queue:queue usingBlock:^(__unused NSNotification *note) {
+            chatgpt_overlay_install();
+        }];
+
+        chatgpt_overlay_install();
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            chatgpt_overlay_install();
+        });
     });
 }
