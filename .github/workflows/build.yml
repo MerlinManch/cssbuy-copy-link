@@ -1,0 +1,49 @@
+name: Build dylib
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "Tweak.xm"
+      - ".github/workflows/build.yml"
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Check files
+        run: |
+          pwd
+          ls -la
+          find . -name "Tweak.xm"
+          test -f "${GITHUB_WORKSPACE}/Tweak.xm"
+
+      - name: Build dylib (arm64 + arm64e)
+        run: |
+          SRC="${GITHUB_WORKSPACE}/Tweak.xm"
+          OUT="${GITHUB_WORKSPACE}/ChatGPTOverlay.dylib"
+          clang -dynamiclib -arch arm64 -arch arm64e \
+            -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
+            -miphoneos-version-min=14.0 \
+            -framework UIKit -framework WebKit \
+            "$SRC" -o "$OUT"
+          install_name_tool -id @executable_path/Frameworks/ChatGPTOverlay.dylib "$OUT"
+
+      - name: Verify architectures
+        run: lipo -info "${GITHUB_WORKSPACE}/ChatGPTOverlay.dylib"
+
+      - name: Ad-hoc sign
+        run: codesign -f -s - "${GITHUB_WORKSPACE}/ChatGPTOverlay.dylib"
+
+      - name: Upload dylib
+        uses: actions/upload-artifact@v4
+        with:
+          name: ChatGPTOverlay-dylib
+          path: ${{ github.workspace }}/ChatGPTOverlay.dylib
