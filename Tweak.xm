@@ -109,7 +109,14 @@ static char ChatGPTOverlayGestureInstalledKey;
 
 - (ASPresentationAnchor)presentationAnchorForWebAuthenticationSession:(ASWebAuthenticationSession *)session {
     [self setupIfNeeded];
-    return _overlayWindow ?: UIApplication.sharedApplication.keyWindow;
+    if (_overlayWindow) return _overlayWindow;
+
+    UIWindowScene *scene = [self activeWindowScene];
+    for (UIWindow *window in scene.windows) {
+        if (window) return window;
+    }
+
+    return nil;
 }
 
 - (void)openSystemLogin {
