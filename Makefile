@@ -5,6 +5,6 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = ChatGPTOverlay
 ChatGPTOverlay_FILES = Tweak.xm
-ChatGPTOverlay_FRAMEWORKS = UIKit WebKit AuthenticationServices
+ChatGPTOverlay_FRAMEWORKS = UIKit WebKit
 
 include $(THEOS_MAKEFILES)/tweak.mk
