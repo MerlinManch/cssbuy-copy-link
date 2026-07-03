@@ -69,7 +69,8 @@
 
 @end
 
-__attribute__((constructor)) static void entry() {
+__attribute__((constructor))
+static void chatgpt_overlay_entry(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         UIWindow *keyWindow = nil;
         for (UIScene *s in [UIApplication sharedApplication].connectedScenes) {

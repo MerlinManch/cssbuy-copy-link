@@ -1,12 +1,11 @@
-name: Build and Inject dylib
+name: Build dylib
 
 on:
   workflow_dispatch:
-    inputs:
-      ipa_url:
-        description: "Direct download URL der Original-IPA (z.B. Release-Asset-Link)"
-        required: true
-        type: string
+  push:
+    paths:
+      - "Tweak.xm"
+      - ".github/workflows/build.yml"
 
 jobs:
   build:
@@ -19,60 +18,23 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
-      - name: Download IPA
-        run: curl -L "${{ github.event.inputs.ipa_url }}" -o App.ipa
-
-      - name: Build dylib
+      - name: Build dylib (arm64 + arm64e)
         run: |
-          clang -dynamiclib -arch arm64 \
+          clang -dynamiclib -arch arm64 -arch arm64e \
             -isysroot $(xcrun --sdk iphoneos --show-sdk-path) \
+            -miphoneos-version-min=14.0 \
             -framework UIKit -framework WebKit \
             Tweak.xm -o ChatGPTOverlay.dylib
           install_name_tool -id @executable_path/Frameworks/ChatGPTOverlay.dylib ChatGPTOverlay.dylib
 
-      - name: Clone and build insert_dylib
-        run: |
-          git clone https://github.com/tyilo/insert_dylib
-          cd insert_dylib
-          xcodebuild -project insert_dylib.xcodeproj -configuration Release
-          cp build/Release/insert_dylib ../insert_dylib_bin
-          chmod +x ../insert_dylib_bin
+      - name: Verify architectures
+        run: lipo -info ChatGPTOverlay.dylib
 
-      - name: Unzip IPA
-        run: |
-          mkdir extracted
-          unzip -q App.ipa -d extracted
+      - name: Ad-hoc sign
+        run: codesign -f -s - ChatGPTOverlay.dylib
 
-      - name: Find app bundle and binary
-        id: appinfo
-        run: |
-          APP_DIR=$(find extracted/Payload -maxdepth 1 -name "*.app")
-          APP_NAME=$(basename "$APP_DIR" .app)
-          echo "app_dir=$APP_DIR" >> $GITHUB_OUTPUT
-          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
-
-      - name: Embed dylib
-        run: |
-          mkdir -p "${{ steps.appinfo.outputs.app_dir }}/Frameworks"
-          cp ChatGPTOverlay.dylib "${{ steps.appinfo.outputs.app_dir }}/Frameworks/"
-
-      - name: Inject load command
-        run: |
-          ./insert_dylib_bin --inplace --strip-codesig \
-            @executable_path/Frameworks/ChatGPTOverlay.dylib \
-            "${{ steps.appinfo.outputs.app_dir }}/${{ steps.appinfo.outputs.app_name }}"
-
-      - name: Ad-hoc sign dylib
-        run: |
-          codesign -f -s - "${{ steps.appinfo.outputs.app_dir }}/Frameworks/ChatGPTOverlay.dylib"
-
-      - name: Repackage IPA
-        run: |
-          cd extracted
-          zip -qr ../App-patched.ipa Payload
-
-      - name: Upload patched IPA
+      - name: Upload dylib
         uses: actions/upload-artifact@v4
         with:
-          name: patched-ipa
-          path: App-patched.ipa
+          name: ChatGPTOverlay-dylib
+          path: ChatGPTOverlay.dylib
