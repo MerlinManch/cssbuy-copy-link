@@ -5,6 +5,8 @@ on:
   push:
     paths:
       - "Tweak.xm"
+      - "Makefile"
+      - "README.md"
       - ".github/workflows/build.yml"
 
 jobs:
@@ -34,7 +36,7 @@ jobs:
             -miphoneos-version-min=14.0 \
             -fobjc-arc \
             -x objective-c \
-            -framework UIKit -framework WebKit -framework SafariServices -framework CoreGraphics \
+            -framework UIKit -framework WebKit -framework AuthenticationServices -framework CoreGraphics \
             "$SRC" -o "$OUT"
           install_name_tool -id @executable_path/Frameworks/ChatGPTOverlay.dylib "$OUT"
 
