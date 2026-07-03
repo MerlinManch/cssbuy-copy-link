@@ -1,5 +1,6 @@
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
+#import <SafariServices/SafariServices.h>
 #import <objc/runtime.h>
 
 static char ChatGPTOverlayGestureInstalledKey;
@@ -7,6 +8,7 @@ static char ChatGPTOverlayGestureInstalledKey;
 @interface ChatGPTOverlay : NSObject
 + (instancetype)shared;
 - (void)installGestureRecognizers;
+- (void)openInSafari;
 - (void)toggle;
 @end
 
@@ -72,6 +74,15 @@ static char ChatGPTOverlayGestureInstalledKey;
     [closeBtn addTarget:self action:@selector(toggle) forControlEvents:UIControlEventTouchUpInside];
     [vc.view addSubview:closeBtn];
 
+    UIButton *safariBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [safariBtn setTitle:@"Login/Safari" forState:UIControlStateNormal];
+    safariBtn.frame = CGRectMake(CGRectGetMaxX(closeBtn.frame) + 12, 40, 120, 32);
+    safariBtn.backgroundColor = [UIColor colorWithWhite:0 alpha:0.7];
+    [safariBtn setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+    safariBtn.layer.cornerRadius = 8;
+    [safariBtn addTarget:self action:@selector(openInSafari) forControlEvents:UIControlEventTouchUpInside];
+    [vc.view addSubview:safariBtn];
+
     NSURL *url = [NSURL URLWithString:@"https://chat.openai.com"];
     [_webView loadRequest:[NSURLRequest requestWithURL:url]];
 }
@@ -93,6 +104,16 @@ static char ChatGPTOverlayGestureInstalledKey;
             objc_setAssociatedObject(window, &ChatGPTOverlayGestureInstalledKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
     }
+}
+
+- (void)openInSafari {
+    [self setupIfNeeded];
+    if (!_overlayWindow.rootViewController) return;
+
+    NSURL *url = _webView.URL ?: [NSURL URLWithString:@"https://chat.openai.com"];
+    SFSafariViewController *safari = [[SFSafariViewController alloc] initWithURL:url];
+    safari.modalPresentationStyle = UIModalPresentationFullScreen;
+    [_overlayWindow.rootViewController presentViewController:safari animated:YES completion:nil];
 }
 
 - (void)toggle {

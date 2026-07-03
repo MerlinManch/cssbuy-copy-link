@@ -34,7 +34,7 @@ jobs:
             -miphoneos-version-min=14.0 \
             -fobjc-arc \
             -x objective-c \
-            -framework UIKit -framework WebKit -framework CoreGraphics \
+            -framework UIKit -framework WebKit -framework SafariServices -framework CoreGraphics \
             "$SRC" -o "$OUT"
           install_name_tool -id @executable_path/Frameworks/ChatGPTOverlay.dylib "$OUT"
 

@@ -12,3 +12,9 @@ iOS-App einblendet. Injection erfolgt separat über Feather.
 ## Architektur
 Gebaut für arm64 + arm64e (deckt alle aktuellen iPads ab).
 Mit `lipo -info ChatGPTOverlay.dylib` prüfbar.
+
+
+## Passkeys / Anmeldung
+Passkey-Popups funktionieren in eingebetteten `WKWebView`s oft nicht zuverlässig.
+Nutze im Overlay den Button "Login/Safari", um ChatGPT in `SFSafariViewController`
+zu öffnen und dich dort mit Passkey anzumelden.
